@@ -6,6 +6,19 @@
 
 PRAGMA foreign_keys = ON;
 
+-- ============================================================
+-- TABLA: USUARIOS (Sistema de Login)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL
+);
+
+-- Usuario por defecto para pruebas 
+INSERT OR IGNORE INTO usuarios (id_usuario, usuario, password) 
+VALUES (1, 'admin', '1234');
 
 -- ============================================================
 -- TABLA: CLIENTES
@@ -13,7 +26,7 @@ PRAGMA foreign_keys = ON;
 --            direccion, saldo, activo
 -- ============================================================
 
-CREATE TABLE clientes (
+CREATE TABLE IF NOT EXISTS clientes (
     id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
     cuit TEXT NOT NULL UNIQUE,
     nombre TEXT NOT NULL,
@@ -32,7 +45,7 @@ CREATE TABLE clientes (
 --            monto, descripcion, estado
 -- ============================================================
 
-CREATE TABLE facturas (
+CREATE TABLE IF NOT EXISTS facturas (
     id_factura INTEGER PRIMARY KEY AUTOINCREMENT,
     id_cliente INTEGER NOT NULL,
     numero TEXT,
@@ -57,7 +70,7 @@ CREATE TABLE facturas (
 --            fecha, monto, metodo_pago
 -- ============================================================
 
-CREATE TABLE pagos (
+CREATE TABLE IF NOT EXISTS pagos (
     id_pago INTEGER PRIMARY KEY AUTOINCREMENT,
     id_cliente INTEGER NOT NULL,
     id_factura INTEGER NOT NULL,
@@ -84,7 +97,7 @@ CREATE TABLE pagos (
 --            tipo, descripcion, saldo_anterior, saldo_nuevo
 -- ============================================================
 
-CREATE TABLE movimientos (
+CREATE TABLE IF NOT EXISTS movimientos (
     id_movimiento INTEGER PRIMARY KEY AUTOINCREMENT,
     id_cliente INTEGER NOT NULL,
     fecha TEXT NOT NULL DEFAULT (DATETIME('now')),
@@ -105,14 +118,14 @@ CREATE TABLE movimientos (
 -- ÍNDICES DE RENDIMIENTO
 -- ============================================================
 
-CREATE INDEX idx_facturas_cliente
+CREATE INDEX IF NOT EXISTS idx_facturas_cliente
 ON facturas(id_cliente);
 
-CREATE INDEX idx_pagos_cliente
+CREATE INDEX IF NOT EXISTS idx_pagos_cliente
 ON pagos(id_cliente);
 
-CREATE INDEX idx_pagos_factura
+CREATE INDEX IF NOT EXISTS idx_pagos_factura
 ON pagos(id_factura);
 
-CREATE INDEX idx_movimientos_cliente
+CREATE INDEX IF NOT EXISTS idx_movimientos_cliente
 ON movimientos(id_cliente);
