@@ -691,13 +691,19 @@ class EditarPago(Pantalla):
         except ValueError:
             messagebox.showwarning("Monto inválido", "El monto debe ser numérico.")
             return
-        if self.app.pago_edicion is None:
-            self.app.agregar_pago(datos)
-            messagebox.showinfo("Contabilidad Fácil", "Pago registrado correctamente.")
-        else:
-            self.app.actualizar_pago(self.app.pago_edicion, datos)
-            messagebox.showinfo("Contabilidad Fácil", "Pago actualizado correctamente.")
-        self.app.mostrar("Pagos")
+        try:
+            if self.app.pago_edicion is None:
+                self.app.agregar_pago(datos)
+                messagebox.showinfo("Contabilidad Fácil", "Pago registrado correctamente.")
+            else:
+                self.app.actualizar_pago(self.app.pago_edicion, datos)
+                messagebox.showinfo("Contabilidad Fácil", "Pago actualizado correctamente.")
+            
+            self.app.mostrar("Pagos")
+        except Exception as e:
+            # Esto mostrará la ventana emergente si el cliente no tiene facturas
+            messagebox.showwarning("No se pudo registrar el pago", str(e))
+
 
 
 # ============================================================
