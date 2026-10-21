@@ -494,7 +494,7 @@ class EditarFactura(Pantalla):
         if factura_id is None:
             self.titulo.config(text="NUEVA FACTURA")
             self.entradas["Fecha"].insert(0, "30/09/2026")
-            self.entradas["Estado"].insert(0, "Pendiente")
+            self.entradas["Estado"].insert(0, "EMITIDA")
         else:
             self.titulo.config(text="EDITAR FACTURA")
             factura = self.app.obtener_factura(factura_id)

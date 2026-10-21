@@ -68,7 +68,16 @@ class GestorDatos:
     def obtener_facturas(self):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
-        cursor.execute("SELECT * FROM facturas")
+        # Hacemos un JOIN para traer el nombre del cliente en lugar de solo su ID numérico
+        cursor.execute("""
+            SELECT f.id_factura as id, 
+                   c.nombre as Cliente, 
+                   f.fecha as Fecha, 
+                   f.monto as Importe, 
+                   f.estado as Estado
+            FROM facturas f
+            JOIN clientes c ON f.id_cliente = c.id_cliente
+        """)
         filas = [dict(fila) for fila in cursor.fetchall()]
         conexion.close()
         return filas
@@ -76,37 +85,85 @@ class GestorDatos:
     def agregar_factura(self, datos):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
-        cursor.execute("""
-            INSERT INTO facturas (Cliente, Fecha, Importe, Estado)
-            VALUES (?, ?, ?, ?)
-        """, (datos["Cliente"], datos["Fecha"], datos["Importe"], datos["Estado"]))
-        conexion.commit()
-        nuevo_id = cursor.lastrowid
-        conexion.close()
-        return nuevo_id
+        try:
+            # 1. Buscar el id_cliente a partir del nombre que viene del formulario
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = ?", (datos["Cliente"],))
+            res_cliente = cursor.fetchone()
+            if not res_cliente:
+                raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
+            id_cliente = res_cliente[0]
+
+            # 2. Adaptar y validar valores
+            fecha = datos["Fecha"]
+            monto = float(datos["Importe"].replace(",", "."))
+            estado = datos["Estado"].strip().upper()
+
+            # 3. Insertar utilizando los nombres reales de la tabla
+            cursor.execute("""
+                INSERT INTO facturas (id_cliente, fecha, monto, estado)
+                VALUES (?, ?, ?, ?)
+            """, (id_cliente, fecha, monto, estado))
+            
+            conexion.commit()
+            nuevo_id = cursor.lastrowid
+            return nuevo_id
+        except Exception as e:
+            conexion.rollback()
+            raise e
+        finally:
+            conexion.close()
 
     def actualizar_factura(self, factura_id, datos):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
-        cursor.execute("""
-            UPDATE facturas 
-            SET Cliente=?, Fecha=?, Importe=?, Estado=?
-            WHERE id=?
-        """, (datos["Cliente"], datos["Fecha"], datos["Importe"], datos["Estado"], factura_id))
-        conexion.commit()
-        conexion.close()
+        try:
+            # 1. Buscar el id_cliente del cliente seleccionado
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = ?", (datos["Cliente"],))
+            res_cliente = cursor.fetchone()
+            if not res_cliente:
+                raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
+            id_cliente = res_cliente[0]
+
+            fecha = datos["Fecha"]
+            monto = float(datos["Importe"].replace(",", "."))
+            estado = datos["Estado"].strip().upper()
+
+            # 2. Actualizar usando id_factura como clave de búsqueda
+            cursor.execute("""
+                UPDATE facturas 
+                SET id_cliente = ?, fecha = ?, monto = ?, estado = ?
+                WHERE id_factura = ?
+            """, (id_cliente, fecha, monto, estado, factura_id))
+            
+            conexion.commit()
+        except Exception as e:
+            conexion.rollback()
+            raise e
+        finally:
+            conexion.close()
 
     def eliminar_factura(self, factura_id):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
-        cursor.execute("DELETE FROM facturas WHERE id_cliente=?", (factura_id,))
+        # Corregido: se elimina por id_factura y no por id_cliente
+        cursor.execute("DELETE FROM facturas WHERE id_factura = ?", (factura_id,))
         conexion.commit()
         conexion.close()
 
     def obtener_factura(self, factura_id):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
-        cursor.execute("SELECT * FROM facturas WHERE id_cliente=?", (factura_id,))
+        # Corregido: se busca por id_factura utilizando JOIN para traer el nombre del cliente
+        cursor.execute("""
+            SELECT f.id_factura as id, 
+                   c.nombre as Cliente, 
+                   f.fecha as Fecha, 
+                   f.monto as Importe, 
+                   f.estado as Estado
+            FROM facturas f
+            JOIN clientes c ON f.id_cliente = c.id_cliente
+            WHERE f.id_factura = ?
+        """, (factura_id,))
         fila = cursor.fetchone()
         conexion.close()
         return dict(fila) if fila else None
@@ -121,35 +178,30 @@ class GestorDatos:
         return filas
 
     def agregar_pago(self, datos):
-    # 'datos' viene del formulario con: 
-    # {"Cliente": "Juan Perez", "Fecha": "30/09/2026", "Monto": "1500", "Estado": "Confirmado", "Medio de pago": "Efectivo"}
+     
     
       conexion = obtener_conexion()
       cursor = conexion.cursor()
 
       try:
-        # 1. Buscar el id_cliente a partir del nombre que viene del formulario
         cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = ?", (datos["Cliente"],))
         resultado_cliente = cursor.fetchone()
         if not resultado_cliente:
             raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
         id_cliente = resultado_cliente[0]
 
-        # 2. Buscar una factura válida para este cliente (requerido por el NOT NULL de la BD)
+        
         cursor.execute("SELECT id_factura FROM facturas WHERE id_cliente = ? LIMIT 1", (id_cliente,))
         resultado_factura = cursor.fetchone()
         if not resultado_factura:
             raise Exception("El cliente seleccionado no tiene facturas registradas para asociar al pago.")
         id_factura = resultado_factura[0]
 
-        # 3. Adaptar los valores restantes
         fecha = datos["Fecha"]
         monto = float(datos["Monto"].replace(",", "."))
         
-        # Convertir a mayúsculas para que coincida con el CHECK ('EFECTIVO', 'TRANSFERENCIA', etc.)
         metodo_pago = datos["Medio de pago"].strip().upper() 
 
-        # 4. Ejecutar el INSERT utilizando exclusivamente las columnas reales de la base de datos
         cursor.execute("""
             INSERT INTO pagos (id_cliente, id_factura, fecha, monto, metodo_pago)
             VALUES (?, ?, ?, ?, ?)
