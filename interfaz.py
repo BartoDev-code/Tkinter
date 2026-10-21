@@ -519,7 +519,7 @@ class Facturas(Pantalla):
             relief="flat", bd=0, command=lambda: self.app.mostrar("MenuMovimientos")
         ).pack(side="left", padx=(0, 10))
 
-        tk.Label(top_bar, text="Facturas", bg=MARRON, fg=NEGRO, font=F_TITULO).pack(side="left", fill="x", expand=True)
+        tk.Label(top_bar, text="Facturas", bg=MARRON, fg=NEGRO, font=F_TITULO, width=25, pady=10).pack(side="top")
 
         tk.Button(
             top_bar, text="[+ Nuevo]", bg=GRIS, fg=GRIS_TXT, font=F_BTN,
@@ -696,7 +696,7 @@ class Pagos(Pantalla):
             relief="flat", bd=0, command=lambda: self.app.mostrar("MenuMovimientos")
         ).pack(side="left", padx=(0, 10))
 
-        tk.Label(top_bar, text="Pagos", bg=MARRON, fg=NEGRO, font=F_TITULO).pack(side="left", fill="x", expand=True)
+        tk.Label(top_bar, text="Pagos", bg=MARRON, fg=NEGRO, font=F_TITULO, width=25, pady=10).pack(side="top")
 
         tk.Button(
             top_bar, text="[+ Nuevo]", bg=GRIS, fg=GRIS_TXT, font=F_BTN,
@@ -802,7 +802,7 @@ class Movimientos(Pantalla):
             relief="flat", bd=0, command=lambda: self.app.mostrar("MenuMovimientos")
         ).pack(side="left", padx=(0, 10))
 
-        tk.Label(top_bar, text="Movimientos", bg=MARRON, fg=NEGRO, font=F_TITULO).pack(side="left", fill="x", expand=True)
+        tk.Label(top_bar, text="Movimientos", bg=MARRON, fg=NEGRO, font=F_TITULO, width=25, pady=10).pack(side="top")
 
         tk.Button(top_bar, text="[+ Nuevo]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, relief="flat", bd=0).pack(side="right")
 
