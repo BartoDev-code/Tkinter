@@ -213,12 +213,17 @@ class Clientes(Pantalla):
         caja = tk.Frame(marco, bg="#e9e7e2", highlightthickness=2, highlightbackground="#8a8a8a", cursor="hand2")
         caja.pack(padx=20, pady=10, ipadx=40, ipady=40)
 
-        etiqueta = tk.Label(caja, text="Lista de\nclientes", bg="#e9e7e2", fg=NEGRO, font=F_TITULO, justify="left")
-        etiqueta.pack(padx=20, pady=20)
+        self.texto_preview = tk.Text(
+            caja, bg="#e9e7e2", fg=NEGRO, font=("Arial", 18),
+            relief="flat", highlightthickness=0, width=32, height=6, wrap="word"
+        )
+        self.texto_preview.tag_configure("centro", justify="center")
+        self.texto_preview.pack(padx=10, pady=10)
+        
+        self.texto_preview.config(state="disabled")
 
-        for w in (caja, etiqueta):
-            w.bind("<Button-1>", lambda e: self.app.mostrar("GestionClientes"))
-
+        self.texto_preview.bind("<Button-1>", lambda e: self.app.mostrar("GestionClientes"))
+        caja.bind("<Button-1>", lambda e: self.app.mostrar("GestionClientes"))
         footer = tk.Frame(self, bg=BG)
         footer.pack(side="bottom", fill="x", padx=40, pady=20)
 
@@ -231,6 +236,19 @@ class Clientes(Pantalla):
         activos = sum(1 for c in self.app.clientes if c["activo"])
         self.lbl_activos.config(text=f"Clientes activos: {activos}")
 
+        self.texto_preview.config(state="normal")
+        self.texto_preview.delete("1.0", "end")
+
+        if not self.app.clientes:
+            self.texto_preview.insert("1.0", "(No hay clientes cargados)", "centro")
+        else:
+            # Unimos los nombres de los clientes con saltos de línea
+            nombres = [c["nombre"] for c in self.app.clientes]
+            texto_unido = "\n".join(nombres)
+            self.texto_preview.insert("1.0", texto_unido, "centro")
+
+        # Volvemos a bloquearlo para que no sea editable
+        self.texto_preview.config(state="disabled")
 
 # ============================================================
 # GESTIÓN DE CLIENTES
