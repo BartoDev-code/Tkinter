@@ -228,7 +228,7 @@ class Clientes(Pantalla):
         tk.Label(footer, text="Pendientes: 12", bg=BG, fg=NEGRO, font=F_TXT).pack(side="right")
 
     def al_mostrar(self):
-        activos = sum(1 for c in self.app.clientes if c["Activo"])
+        activos = sum(1 for c in self.app.clientes if c["activo"])
         self.lbl_activos.config(text=f"Clientes activos: {activos}")
 
 
