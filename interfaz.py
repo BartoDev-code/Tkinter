@@ -242,12 +242,12 @@ class Clientes(Pantalla):
         if not self.app.clientes:
             self.texto_preview.insert("1.0", "(No hay clientes cargados)", "centro")
         else:
-            # Unimos los nombres de los clientes con saltos de línea
+            
             nombres = [c["nombre"] for c in self.app.clientes]
             texto_unido = "\n".join(nombres)
             self.texto_preview.insert("1.0", texto_unido, "centro")
 
-        # Volvemos a bloquearlo para que no sea editable
+        
         self.texto_preview.config(state="disabled")
 
 # ============================================================
@@ -478,28 +478,50 @@ class EditarFactura(Pantalla):
 
         self.entradas = {}
         campos = ["Cliente", "Fecha", "Importe", "Estado"]
+        
         for i, nombre in enumerate(campos):
             tk.Label(form_frame, text=f"{nombre}:", bg=BG, fg=NEGRO, font=F_TXT, anchor="e").grid(row=i, column=0, sticky="e", padx=10, pady=8)
-            e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
+            
+            # Si el campo es "Estado", creamos un Combobox desplegable en lugar de un Entry de texto libre
+            if nombre == "Estado":
+                e = ttk.Combobox(
+                    form_frame, 
+                    values=["EMITIDA", "PAGO PARCIAL", "PAGADA", "ANULADA"], 
+                    font=F_TXT, 
+                    state="readonly" # Impide que escriban texto libre, obligando a elegir de la lista
+                )
+            else:
+                e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
+                
             e.grid(row=i, column=1, sticky="ew", padx=10, pady=8, ipady=3)
             self.entradas[nombre] = e
 
-        tk.Label(form_frame, text="Ejemplo de estado: Pendiente / Pagada / Anulada", bg=BG, fg=GRIS, font=F_CHICA).grid(row=len(campos), column=1, sticky="w", padx=10)
+        tk.Label(form_frame, text="Seleccioná el estado correspondiente de la lista.", bg=BG, fg=GRIS, font=F_CHICA).grid(row=len(campos), column=1, sticky="w", padx=10)
         form_frame.columnconfigure(1, weight=1)
 
     def al_mostrar(self):
-        for e in self.entradas.values():
-            e.delete(0, "end")
+        # Limpiamos o seteamos valores por defecto al abrir la pantalla
+        for campo, e in self.entradas.items():
+            if isinstance(e, ttk.Combobox):
+                e.set("EMITIDA") # Valor por defecto seguro
+            else:
+                e.delete(0, "end")
+                
         factura_id = self.app.factura_edicion
         if factura_id is None:
             self.titulo.config(text="NUEVA FACTURA")
             self.entradas["Fecha"].insert(0, "30/09/2026")
-            self.entradas["Estado"].insert(0, "EMITIDA")
+            self.entradas["Estado"].set("EMITIDA")
         else:
             self.titulo.config(text="EDITAR FACTURA")
             factura = self.app.obtener_factura(factura_id)
             for campo in self.entradas:
-                self.entradas[campo].insert(0, factura.get(campo, ""))
+                valor = factura.get(campo, "")
+                # Manejamos diferenciadamente si es un Combobox o un Entry común
+                if isinstance(self.entradas[campo], ttk.Combobox):
+                    self.entradas[campo].set(valor)
+                else:
+                    self.entradas[campo].insert(0, valor)
 
     def guardar(self):
         datos = {campo: self.entradas[campo].get().strip() for campo in self.entradas}
@@ -512,8 +534,9 @@ class EditarFactura(Pantalla):
         try:
             float(datos["Importe"].replace(",", "."))
         except ValueError:
-            messagebox.showwarning("Importe inválido", "El importe debe ser numérico.")
+            messagebox.showwarning("Monto inválido", "El monto debe ser numérico.")
             return
+            
         if self.app.factura_edicion is None:
             self.app.agregar_factura(datos)
             messagebox.showinfo("Contabilidad Fácil", "Factura creada correctamente.")
@@ -655,7 +678,7 @@ class EditarPago(Pantalla):
         form_frame.pack(side="top", fill="both", expand=True, padx=80, pady=20)
 
         self.entradas = {}
-        campos = ["Cliente", "Fecha", "Monto", "Estado", "Medio de pago"]
+        campos = ["Cliente", "Fecha", "Monto", "Medio de pago"]
         for i, nombre in enumerate(campos):
             tk.Label(form_frame, text=f"{nombre}:", bg=BG, fg=NEGRO, font=F_TXT, anchor="e").grid(row=i, column=0, sticky="e", padx=10, pady=8)
             e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
@@ -671,7 +694,7 @@ class EditarPago(Pantalla):
         if pago_id is None:
             self.titulo.config(text="NUEVO PAGO")
             self.entradas["Fecha"].insert(0, "30/09/2026")
-            self.entradas["Estado"].insert(0, "Confirmado")
+            
         else:
             self.titulo.config(text="EDITAR PAGO")
             pago = self.app.obtener_pago(pago_id)
@@ -747,7 +770,7 @@ class Pagos(Pantalla):
         table_frame = tk.Frame(self, bg="#ffffff", highlightthickness=2, highlightbackground=BORDE)
         table_frame.pack(side="top", fill="both", expand=True, padx=40, pady=10)
 
-        columnas = ("ID", "Cliente", "Fecha", "Monto", "Estado", "Medio de pago")
+        columnas = ("ID", "Cliente", "Fecha", "Monto", "Medio de pago")
         self.tabla = ttk.Treeview(table_frame, columns=columnas, show="headings", style="Maq.Treeview", selectmode="browse")
         anchos = (70, 170, 120, 120, 100, 120)
         for col, an in zip(columnas, anchos):
@@ -771,10 +794,10 @@ class Pagos(Pantalla):
         filtro = self.buscar.get().strip().lower()
         filas = []
         for p in self.app.pagos:
-            texto = (str(p["id"]) + p["Cliente"] + p["Fecha"] + p["Estado"] + p["Medio de pago"]).lower()
+            texto = (str(p["id"]) + p["Cliente"] + p["Fecha"] + p["Medio de pago"]).lower()
             if filtro and filtro not in texto:
                 continue
-            filas.append((p["id"], p["Cliente"], p["Fecha"], p["Monto"], p["Estado"], p["Medio de pago"]))
+            filas.append((p["id"], p["Cliente"], p["Fecha"], p["Monto"], p["Medio de pago"]))
         cargar(self.tabla, filas)
 
     def nuevo(self):
@@ -797,7 +820,7 @@ class Pagos(Pantalla):
         p = self.app.obtener_pago(pago_id)
         messagebox.showinfo(
             "Detalle del pago",
-            f"ID: {p['id']}\nCliente: {p['Cliente']}\nFecha: {p['Fecha']}\nMonto: ${p['Monto']}\nEstado: {p['Estado']}\nMedio de pago: {p['Medio de pago']}"
+            f"ID: {p['id']}\nCliente: {p['Cliente']}\nFecha: {p['Fecha']}\nMonto: ${p['Monto']}\nMedio de pago: {p['Medio de pago']}"
         )
 
     def eliminar(self):
