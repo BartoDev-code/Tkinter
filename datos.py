@@ -1,4 +1,5 @@
 from conexion import obtener_conexion
+from datetime import datetime
 
 class GestorDatos:
     def __init__(self):
@@ -104,7 +105,12 @@ class GestorDatos:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = res_cliente[0]
 
-            fecha = datos["Fecha"]
+            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para MySQL
+            try:
+                fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
+            except ValueError:
+                fecha = datos["Fecha"]
+
             monto = float(datos["Importe"].replace(",", "."))
             estado = datos["Estado"].strip().upper()
 
@@ -132,7 +138,12 @@ class GestorDatos:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = res_cliente[0]
 
-            fecha = datos["Fecha"]
+            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para MySQL
+            try:
+                fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
+            except ValueError:
+                fecha = datos["Fecha"]
+
             monto = float(datos["Importe"].replace(",", "."))
             estado = datos["Estado"].strip().upper()
 
@@ -210,7 +221,12 @@ class GestorDatos:
                 raise Exception("El cliente seleccionado no tiene facturas registradas para asociar al pago.")
             id_factura = resultado_factura[0]
 
-            fecha = datos["Fecha"]
+            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para MySQL
+            try:
+                fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
+            except ValueError:
+                fecha = datos["Fecha"]
+
             monto = float(datos["Monto"].replace(",", "."))
             metodo_pago = datos["Medio de pago"].strip().upper() 
 

@@ -611,7 +611,7 @@ class Facturas(Pantalla):
         filtro = self.buscar.get().strip().lower()
         filas = []
         for f in self.app.facturas:
-            texto = (str(f["id"]) + f["Cliente"] + f["Fecha"] + f["Estado"]).lower()
+            texto = (str(f["id"]) + str(f["Cliente"]) + str(f["Fecha"]) + str(f["Estado"])).lower()
             if filtro and filtro not in texto:
                 continue
             filas.append((f["id"], f["Cliente"], f["Fecha"], f["Importe"], f["Estado"]))
@@ -794,7 +794,7 @@ class Pagos(Pantalla):
         filtro = self.buscar.get().strip().lower()
         filas = []
         for p in self.app.pagos:
-            texto = (str(p["id"]) + p["Cliente"] + p["Fecha"] + p["Medio de pago"]).lower()
+            texto = (str(p["id"]) + str(p["Cliente"]) + str(p["Fecha"]) + str(p["Medio de pago"])).lower()
             if filtro and filtro not in texto:
                 continue
             filas.append((p["id"], p["Cliente"], p["Fecha"], p["Monto"], p["Medio de pago"]))
