@@ -293,7 +293,7 @@ class GestionClientes(Pantalla):
         table_frame = tk.Frame(self, bg="#ffffff", highlightthickness=2, highlightbackground=BORDE)
         table_frame.pack(side="top", fill="both", expand=True, padx=40, pady=10)
 
-        columnas = ("id", "Nombre", "CUIT", "Activo")
+        columnas = ("id", "nombre", "CUIT", "activo")
         self.tabla = ttk.Treeview(table_frame, columns=columnas, show="headings", style="Maq.Treeview", selectmode="browse")
         anchos = (90, 280, 180, 140)
         for col, an in zip(columnas, anchos):
@@ -351,7 +351,7 @@ class GestionClientes(Pantalla):
 # ============================================================
 
 class EditarCliente(Pantalla):
-    CAMPOS = ["Nombre", "CUIT", "Email", "Teléfono", "Dirección"]
+    CAMPOS = ["nombre", "CUIT", "email", "teléfono", "dirección"]
 
     def construir(self):
         top_bar = tk.Frame(self, bg=BG)
@@ -402,11 +402,11 @@ class EditarCliente(Pantalla):
             for campo in self.CAMPOS:
                 self.entradas[campo].insert(0, cliente.get(campo, ""))
             self.activo.set(bool(cliente.get("Activo", True)))
-        self.entradas["Nombre"].focus_set()
+        self.entradas["nombre"].focus_set()
 
     def guardar(self):
         datos_cliente = {campo: self.entradas[campo].get().strip() for campo in self.CAMPOS}
-        if not datos_cliente["Nombre"]:
+        if not datos_cliente["nombre"]:
             messagebox.showwarning("Datos incompletos", "El nombre del cliente es obligatorio.")
             return
         datos_cliente["Activo"] = self.activo.get()

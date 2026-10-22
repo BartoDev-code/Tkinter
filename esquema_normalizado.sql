@@ -1,60 +1,66 @@
 -- ============================================================
--- SCRIPT DDL - SISTEMA DE GESTIÓN CONTABLE (CONTABILIDAD FÁCIL)
--- Versión 3 - Ajustado según el Diccionario de Datos y Modelo 3FN
--- Base de datos: SQLite
+-- SCRIPT DDL - CONTABILIDAD FACIL
+-- Motor: MySQL
 -- ============================================================
 
-PRAGMA foreign_keys = ON;
+CREATE DATABASE IF NOT EXISTS contabilidad_facil;
+USE contabilidad_facil;
 
 -- ============================================================
--- TABLA: USUARIOS (Sistema de Login)
+-- TABLA: USUARIOS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS usuarios (
-    id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL
+    id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+    usuario VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL
 );
 
--- Usuario por defecto para pruebas 
-INSERT OR IGNORE INTO usuarios (id_usuario, usuario, password) 
+INSERT IGNORE INTO usuarios (id_usuario, usuario, password)
 VALUES (1, 'admin', '1234');
+
 
 -- ============================================================
 -- TABLA: CLIENTES
--- Atributos: id_cliente, cuit, nombre, email, telefono,
---            direccion, saldo, activo
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS clientes (
-    id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
-    cuit TEXT NOT NULL UNIQUE,
-    nombre TEXT NOT NULL,
-    email TEXT UNIQUE,
-    telefono TEXT,
+    id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+    cuit VARCHAR(20) NOT NULL UNIQUE,
+    nombre VARCHAR(150) NOT NULL,
+    email VARCHAR(150) UNIQUE,
+    telefono VARCHAR(50),
     direccion TEXT,
-    saldo REAL NOT NULL DEFAULT 0.0,
-    activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))
+    saldo DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    activo TINYINT NOT NULL DEFAULT 1
+        CHECK (activo IN (0, 1))
 );
 
 
 -- ============================================================
 -- TABLA: FACTURAS
--- Relación: CLIENTE (1) ---- EMITE ----> (N) FACTURA
--- Atributos: id_factura, id_cliente (FK), numero, fecha,
---            monto, descripcion, estado
+-- CLIENTES (1) ---- (N) FACTURAS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS facturas (
-    id_factura INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_cliente INTEGER NOT NULL,
-    numero TEXT,
-    fecha TEXT NOT NULL DEFAULT (DATE('now')),
-    monto REAL NOT NULL CHECK (monto > 0),
+    id_factura INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente INT NOT NULL,
+    numero VARCHAR(50),
+    fecha DATE NOT NULL DEFAULT (CURRENT_DATE),
+    monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
     descripcion TEXT,
-    estado TEXT NOT NULL DEFAULT 'EMITIDA' CHECK (estado IN ('EMITIDA', 'PAGO PARCIAL', 'PAGADA', 'ANULADA')),
+    estado VARCHAR(20) NOT NULL DEFAULT 'EMITIDA'
+        CHECK (
+            estado IN (
+                'EMITIDA',
+                'PAGO PARCIAL',
+                'PAGADA',
+                'ANULADA'
+            )
+        ),
 
-    FOREIGN KEY (id_cliente)
+    CONSTRAINT fk_facturas_cliente
+        FOREIGN KEY (id_cliente)
         REFERENCES clientes(id_cliente)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
@@ -63,27 +69,35 @@ CREATE TABLE IF NOT EXISTS facturas (
 
 -- ============================================================
 -- TABLA: PAGOS
--- Relaciones: 
---   CLIENTE (1) ---- REALIZA ----> (N) PAGO
---   FACTURA (1) ---- RECIBE ----> (N) PAGO
--- Atributos: id_pago, id_cliente (FK), id_factura (FK),
---            fecha, monto, metodo_pago
+-- CLIENTES (1) ---- (N) PAGOS
+-- FACTURAS (1) ---- (N) PAGOS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS pagos (
-    id_pago INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_cliente INTEGER NOT NULL,
-    id_factura INTEGER NOT NULL,
-    fecha TEXT NOT NULL DEFAULT (DATE('now')),
-    monto REAL NOT NULL CHECK (monto > 0),
-    metodo_pago TEXT NOT NULL CHECK (metodo_pago IN ('EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'MERCADO PAGO', 'TARJETA')),
+    id_pago INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente INT NOT NULL,
+    id_factura INT NOT NULL,
+    fecha DATE NOT NULL DEFAULT (CURRENT_DATE),
+    monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
+    metodo_pago VARCHAR(50) NOT NULL
+        CHECK (
+            metodo_pago IN (
+                'EFECTIVO',
+                'TRANSFERENCIA',
+                'CHEQUE',
+                'MERCADO PAGO',
+                'TARJETA'
+            )
+        ),
 
-    FOREIGN KEY (id_cliente)
+    CONSTRAINT fk_pagos_cliente
+        FOREIGN KEY (id_cliente)
         REFERENCES clientes(id_cliente)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    FOREIGN KEY (id_factura)
+    CONSTRAINT fk_pagos_factura
+        FOREIGN KEY (id_factura)
         REFERENCES facturas(id_factura)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
@@ -92,40 +106,26 @@ CREATE TABLE IF NOT EXISTS pagos (
 
 -- ============================================================
 -- TABLA: MOVIMIENTOS
--- Relación: CLIENTE (1) ---- TIENE ----> (N) MOVIMIENTO_CC
--- Atributos: id_movimiento, id_cliente (FK), fecha, monto,
---            tipo, descripcion, saldo_anterior, saldo_nuevo
+-- CLIENTES (1) ---- (N) MOVIMIENTOS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS movimientos (
-    id_movimiento INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_cliente INTEGER NOT NULL,
-    fecha TEXT NOT NULL DEFAULT (DATETIME('now')),
-    monto REAL NOT NULL CHECK (monto <> 0),
-    tipo TEXT NOT NULL CHECK (tipo IN ('DEBITO', 'CREDITO')),
+    id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente INT NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    monto DECIMAL(10,2) NOT NULL CHECK (monto <> 0),
+    tipo VARCHAR(20) NOT NULL
+        CHECK (tipo IN ('DEBITO', 'CREDITO')),
     descripcion TEXT,
-    saldo_anterior REAL NOT NULL DEFAULT 0.0,
-    saldo_nuevo REAL NOT NULL DEFAULT 0.0,
+    saldo_anterior DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    saldo_nuevo DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 
-    FOREIGN KEY (id_cliente)
+    CONSTRAINT fk_movimientos_cliente
+        FOREIGN KEY (id_cliente)
         REFERENCES clientes(id_cliente)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
 
 
--- ============================================================
--- ÍNDICES DE RENDIMIENTO
--- ============================================================
 
-CREATE INDEX IF NOT EXISTS idx_facturas_cliente
-ON facturas(id_cliente);
-
-CREATE INDEX IF NOT EXISTS idx_pagos_cliente
-ON pagos(id_cliente);
-
-CREATE INDEX IF NOT EXISTS idx_pagos_factura
-ON pagos(id_factura);
-
-CREATE INDEX IF NOT EXISTS idx_movimientos_cliente
-ON movimientos(id_cliente);
