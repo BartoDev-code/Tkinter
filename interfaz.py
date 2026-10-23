@@ -342,8 +342,12 @@ class GestionClientes(Pantalla):
         cliente = self.app.obtener_cliente(cliente_id)
         if not messagebox.askyesno("Confirmar eliminación", f"¿Eliminar a «{cliente['nombre']}»?"):
             return
-        self.app.eliminar_cliente(cliente_id)
-        self.refrescar()
+            
+        try:
+            self.app.eliminar_cliente(cliente_id)
+            self.refrescar()
+        except Exception as e:
+            messagebox.showwarning("No se pudo eliminar", str(e))
 
 
 # ============================================================

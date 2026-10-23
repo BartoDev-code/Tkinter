@@ -10,103 +10,213 @@ class GestorDatos:
 
     # ==================== CLIENTES ====================
     def verificar_usuario(self, usuario, password):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute(
-            "SELECT * FROM usuarios WHERE usuario = %s AND password = %s", 
-            (usuario, password)
-        )
-        fila = cursor.fetchone()
-        conexion.close()
-        return fila is not None 
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT * FROM usuarios WHERE usuario = %s AND password = %s", 
+                (usuario, password)
+            )
+            fila = cursor.fetchone()
+            return fila is not None 
+        except mysql.connector.Error as err:
+            print(f"Error en verificar_usuario: {err}")
+            return False
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
     
     def obtener_clientes(self):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("SELECT * FROM clientes")
-        columnas = [col[0] for col in cursor.description]
-        filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
-        conexion.close()
-        return filas
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT * FROM clientes")
+            columnas = [col[0] for col in cursor.description]
+            filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return filas
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_clientes: {err}")
+            return []
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def agregar_cliente(self, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            INSERT INTO clientes (nombre, cuit, email, telefono, direccion, activo)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (datos["nombre"], datos["CUIT"], datos["email"], datos["teléfono"], datos["dirección"], 1 if datos["Activo"] else 0))
-        conexion.commit()
-        nuevo_id = cursor.lastrowid
-        conexion.close()
-        return nuevo_id
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO clientes (nombre, cuit, email, telefono, direccion, activo)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (datos["nombre"], datos["CUIT"], datos["email"], datos["teléfono"], datos["dirección"], 1 if datos["Activo"] else 0))
+            conexion.commit()
+            nuevo_id = cursor.lastrowid
+            return nuevo_id
+        except Exception as e:
+            if conexion and conexion.is_connected():
+                conexion.rollback()
+            raise e
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def actualizar_cliente(self, cliente_id, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            UPDATE clientes 
-            SET nombre=%s, cuit=%s, email=%s, telefono=%s, direccion=%s, activo=%s
-            WHERE id_cliente=%s
-        """, (datos["nombre"], datos["CUIT"], datos["email"], datos["teléfono"], datos["dirección"], 1 if datos["activo"] else 0, cliente_id))
-        conexion.commit()
-        conexion.close()
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+
+            activo_valor = 1 if datos.get("Activo", datos.get("activo", 1)) else 0
+
+            cursor.execute("""
+                UPDATE clientes 
+                SET nombre=%s, cuit=%s, email=%s, telefono=%s, direccion=%s, activo=%s
+                WHERE id_cliente=%s
+            """, (datos["nombre"], datos["CUIT"], datos["email"], datos["teléfono"], datos["dirección"], 1 if datos["activo"] else 0, cliente_id))
+            conexion.commit()
+        except Exception as e:
+            if conexion and conexion.is_connected():
+                conexion.rollback()
+            raise e
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def eliminar_cliente(self, cliente_id):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("DELETE FROM clientes WHERE id_cliente=%s", (cliente_id,))
-        conexion.commit()
-        conexion.close()
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            
+            # 1. Borrar movimientos del cliente
+            cursor.execute("DELETE FROM movimientos WHERE id_cliente = %s", (cliente_id,))
+            
+            # 2. Borrar pagos del cliente
+            cursor.execute("DELETE FROM pagos WHERE id_cliente = %s", (cliente_id,))
+            
+            # 3. Borrar facturas del cliente
+            cursor.execute("DELETE FROM facturas WHERE id_cliente = %s", (cliente_id,))
+            
+            # 4. Finalmente, borrar el cliente
+            cursor.execute("DELETE FROM clientes WHERE id_cliente = %s", (cliente_id,))
+            
+            conexion.commit()
+        except Exception as e:
+            if conexion and conexion.is_connected():
+                conexion.rollback()
+            raise e
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def obtener_cliente(self, cliente_id):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            SELECT id_cliente AS id_cliente,
-                   nombre AS nombre,
-                   cuit AS CUIT,
-                   email AS email,
-                   telefono AS teléfono,
-                   direccion AS dirección,
-                   saldo AS saldo,
-                   activo AS Activo
-            FROM clientes WHERE id_cliente=%s
-        """, (cliente_id,))
-        columnas = [col[0] for col in cursor.description]
-        fila = cursor.fetchone()
-        conexion.close()
-        return dict(zip(columnas, fila)) if fila else None
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id_cliente AS id_cliente,
+                       nombre AS nombre,
+                       cuit AS CUIT,
+                       email AS email,
+                       telefono AS teléfono,
+                       direccion AS dirección,
+                       saldo AS saldo,
+                       activo AS Activo
+                FROM clientes WHERE id_cliente=%s
+            """, (cliente_id,))
+            columnas = [col[0] for col in cursor.description]
+            fila = cursor.fetchone()
+            return dict(zip(columnas, fila)) if fila else None
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_cliente: {err}")
+            return None
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     # ==================== FACTURAS ====================
     def obtener_facturas(self):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            SELECT f.id_factura as id, 
-                   c.nombre as Cliente, 
-                   f.fecha as Fecha, 
-                   f.monto as Importe, 
-                   f.estado as Estado
-            FROM facturas f
-            JOIN clientes c ON f.id_cliente = c.id_cliente
-        """)
-        columnas = [col[0] for col in cursor.description]
-        filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
-        conexion.close()
-        return filas
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT f.id_factura as id, 
+                       c.nombre as Cliente, 
+                       f.fecha as Fecha, 
+                       f.monto as Importe, 
+                       f.estado as Estado
+                FROM facturas f
+                JOIN clientes c ON f.id_cliente = c.id_cliente
+            """)
+            columnas = [col[0] for col in cursor.description]
+            filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return filas
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_facturas: {err}")
+            return []
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def agregar_factura(self, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+        conexion = None
+        cursor = None
         try:
-            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s", (datos["Cliente"],))
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             res_cliente = cursor.fetchone()
             if not res_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = res_cliente[0]
 
-            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para MySQL
             try:
                 fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
             except ValueError:
@@ -124,22 +234,30 @@ class GestorDatos:
             nuevo_id = cursor.lastrowid
             return nuevo_id
         except Exception as e:
-            conexion.rollback()
+            if conexion and conexion.is_connected():
+                conexion.rollback()
             raise e
         finally:
-            conexion.close()
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def actualizar_factura(self, factura_id, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+        conexion = None
+        cursor = None
         try:
-            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s", (datos["Cliente"],))
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             res_cliente = cursor.fetchone()
             if not res_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = res_cliente[0]
 
-            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para MySQL
             try:
                 fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
             except ValueError:
@@ -156,69 +274,117 @@ class GestorDatos:
             
             conexion.commit()
         except Exception as e:
-            conexion.rollback()
+            if conexion and conexion.is_connected():
+                conexion.rollback()
             raise e
         finally:
-            conexion.close()
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def eliminar_factura(self, factura_id):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+        conexion = None
+        cursor = None
         try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
             cursor.execute("DELETE FROM facturas WHERE id_factura = %s", (factura_id,))
             conexion.commit()
         except mysql.connector.Error as err:
-            conexion.rollback()
+            if conexion and conexion.is_connected():
+                conexion.rollback()
             if err.errno == 1451:
                 raise Exception("No se puede eliminar esta factura porque tiene pagos asociados. Debes eliminar los pagos vinculados primero.")
             else:
                 raise err
+        except Exception as e:
+            if conexion and conexion.is_connected():
+                conexion.rollback()
+            raise e
         finally:
-            conexion.close()
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def obtener_factura(self, factura_id):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            SELECT f.id_factura AS id, 
-                   c.nombre AS Cliente, 
-                   f.fecha AS Fecha, 
-                   f.monto AS Importe, 
-                   f.estado AS Estado
-            FROM facturas f
-            JOIN clientes c ON f.id_cliente = c.id_cliente
-            WHERE f.id_factura = %s
-        """, (factura_id,))
-        columnas = [col[0] for col in cursor.description]
-        fila = cursor.fetchone()
-        conexion.close()
-        return dict(zip(columnas, fila)) if fila else None
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT f.id_factura AS id, 
+                       c.nombre AS Cliente, 
+                       f.fecha AS Fecha, 
+                       f.monto AS Importe, 
+                       f.estado AS Estado
+                FROM facturas f
+                JOIN clientes c ON f.id_cliente = c.id_cliente
+                WHERE f.id_factura = %s
+            """, (factura_id,))
+            columnas = [col[0] for col in cursor.description]
+            fila = cursor.fetchone()
+            return dict(zip(columnas, fila)) if fila else None
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_factura: {err}")
+            return None
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     # ==================== PAGOS ====================
     def obtener_pagos(self):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            SELECT p.id_pago AS id, 
-                   c.nombre AS Cliente, 
-                   f.numero AS Factura, 
-                   p.fecha AS Fecha, 
-                   p.monto AS Monto, 
-                   p.metodo_pago AS 'Medio de pago'
-            FROM pagos p
-            JOIN clientes c ON p.id_cliente = c.id_cliente
-            JOIN facturas f ON p.id_factura = f.id_factura
-        """)
-        columnas = [col[0] for col in cursor.description]
-        filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
-        conexion.close()
-        return filas
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT p.id_pago AS id, 
+                       c.nombre AS Cliente, 
+                       f.numero AS Factura, 
+                       p.fecha AS Fecha, 
+                       p.monto AS Monto, 
+                       p.metodo_pago AS 'Medio de pago'
+                FROM pagos p
+                JOIN clientes c ON p.id_cliente = c.id_cliente
+                JOIN facturas f ON p.id_factura = f.id_factura
+            """)
+            columnas = [col[0] for col in cursor.description]
+            filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return filas
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_pagos: {err}")
+            return []
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def agregar_pago(self, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+        conexion = None
+        cursor = None
         try:
-            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s", (datos["Cliente"],))
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             resultado_cliente = cursor.fetchone()
             if not resultado_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
@@ -230,7 +396,6 @@ class GestorDatos:
                 raise Exception("El cliente seleccionado no tiene facturas registradas para asociar al pago.")
             id_factura = resultado_factura[0]
 
-            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para MySQL
             try:
                 fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
             except ValueError:
@@ -246,16 +411,25 @@ class GestorDatos:
 
             conexion.commit()
         except Exception as e:
-            conexion.rollback()
+            if conexion and conexion.is_connected():
+                conexion.rollback()
             raise e
         finally:
-            conexion.close()
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def actualizar_pago(self, pago_id, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+        conexion = None
+        cursor = None
         try:
-            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s", (datos["Cliente"],))
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             res_cliente = cursor.fetchone()
             if not res_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
@@ -279,47 +453,83 @@ class GestorDatos:
             
             conexion.commit()
         except Exception as e:
-            conexion.rollback()
+            if conexion and conexion.is_connected():
+                conexion.rollback()
             raise e
         finally:
-            conexion.close()
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def eliminar_pago(self, pago_id):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("DELETE FROM pagos WHERE id_pago = %s", (pago_id,))
-        conexion.commit()
-        conexion.close()
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM pagos WHERE id_pago = %s", (pago_id,))
+            conexion.commit()
+        except Exception as e:
+            if conexion and conexion.is_connected():
+                conexion.rollback()
+            raise e
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
 
     def obtener_pago(self, pago_id):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute("""
-            SELECT p.id_pago AS id, 
-                   c.nombre AS Cliente, 
-                   p.fecha AS Fecha, 
-                   p.monto AS Monto, 
-                   p.metodo_pago AS 'Medio de pago'
-            FROM pagos p
-            JOIN clientes c ON p.id_cliente = c.id_cliente
-            WHERE p.id_pago = %s
-        """, (pago_id,))
-        columnas = [col[0] for col in cursor.description]
-        fila = cursor.fetchone()
-        conexion.close()
-        return dict(zip(columnas, fila)) if fila else None
-    def agregar_movimiento(self, datos):
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+        conexion = None
+        cursor = None
         try:
-            # Buscar ID del cliente por su nombre
-            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s", (datos["Cliente"],))
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT p.id_pago AS id, 
+                       c.nombre AS Cliente, 
+                       p.fecha AS Fecha, 
+                       p.monto AS Monto, 
+                       p.metodo_pago AS 'Medio de pago'
+                FROM pagos p
+                JOIN clientes c ON p.id_cliente = c.id_cliente
+                WHERE p.id_pago = %s
+            """, (pago_id,))
+            columnas = [col[0] for col in cursor.description]
+            fila = cursor.fetchone()
+            return dict(zip(columnas, fila)) if fila else None
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_pago: {err}")
+            return None
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
+
+    # ==================== MOVIMIENTOS ====================
+    def agregar_movimiento(self, datos):
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             res_cliente = cursor.fetchone()
             if not res_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = res_cliente[0]
 
-            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD
             try:
                 fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
             except ValueError:
@@ -337,7 +547,14 @@ class GestorDatos:
             conexion.commit()
             return cursor.lastrowid
         except Exception as e:
-            conexion.rollback()
+            if conexion and conexion.is_connected():
+                conexion.rollback()
             raise e
         finally:
-            conexion.close()
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
