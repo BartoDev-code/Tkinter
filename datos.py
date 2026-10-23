@@ -384,30 +384,52 @@ class GestorDatos:
         try:
             conexion = obtener_conexion()
             cursor = conexion.cursor()
+            
+            # 1. Obtener ID del cliente
             cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             resultado_cliente = cursor.fetchone()
             if not resultado_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = resultado_cliente[0]
 
-            cursor.execute("SELECT id_factura FROM facturas WHERE id_cliente = %s LIMIT 1", (id_cliente,))
+            # 2. Obtener factura pendiente del cliente (o la asociada)
+            cursor.execute("SELECT id_factura, monto FROM facturas WHERE id_cliente = %s AND estado != 'PAGADA' LIMIT 1", (id_cliente,))
             resultado_factura = cursor.fetchone()
             if not resultado_factura:
-                raise Exception("El cliente seleccionado no tiene facturas registradas para asociar al pago.")
-            id_factura = resultado_factura[0]
+                raise Exception("El cliente seleccionado no tiene facturas pendientes de pago.")
+            id_factura, monto_factura = resultado_factura[0], resultado_factura[1]
 
+            # Convertir fecha
             try:
                 fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
             except ValueError:
                 fecha = datos["Fecha"]
 
-            monto = float(datos["Monto"].replace(",", "."))
+            monto_pago = float(datos["Monto"].replace(",", "."))
             metodo_pago = datos["Medio de pago"].strip().upper() 
 
+            # 3. Insertar el pago
             cursor.execute("""
                 INSERT INTO pagos (id_cliente, id_factura, fecha, monto, metodo_pago)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (id_cliente, id_factura, fecha, monto, metodo_pago))
+            """, (id_cliente, id_factura, fecha, monto_pago, metodo_pago))
+
+            # 4. Determinar si la factura queda PAGADA o PAGADA_PARCIAL
+            # (Opcional: puedes sumar pagos previos si haces pagos fraccionados reales)
+            if monto_pago >= float(monto_factura):
+                nuevo_estado = 'PAGADA'
+            else:
+                nuevo_estado = 'PAGADA_PARCIAL'
+
+            cursor.execute("""
+                UPDATE facturas SET estado = %s WHERE id_factura = %s
+            """, (nuevo_estado, id_factura))
+
+            # 5. Registrar automáticamente el movimiento en la cuenta corriente
+            cursor.execute("""
+                INSERT INTO movimientos (id_cliente, fecha, monto, tipo, descripcion)
+                VALUES (%s, %s, %s, 'CREDITO', %s)
+            """, (id_cliente, fecha, monto_pago, f"Pago de factura ID {id_factura}"))
 
             conexion.commit()
         except Exception as e:
@@ -518,6 +540,38 @@ class GestorDatos:
                 conexion.close()
 
     # ==================== MOVIMIENTOS ====================
+
+    def obtener_movimientos(self):
+        conexion = None
+        cursor = None
+        try:
+            conexion = obtener_conexion()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT m.id_movimiento AS id, 
+                       c.nombre AS Cliente, 
+                       m.descripcion AS Descripcion, 
+                       m.fecha AS Fecha, 
+                       m.monto AS Importe, 
+                       m.tipo AS Tipo
+                FROM movimientos m
+                JOIN clientes c ON m.id_cliente = c.id_cliente
+            """)
+            columnas = [col[0] for col in cursor.description]
+            filas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return filas
+        except mysql.connector.Error as err:
+            print(f"Error en obtener_movimientos: {err}")
+            return []
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conexion and conexion.is_connected():
+                conexion.close()
+
     def agregar_movimiento(self, datos):
         conexion = None
         cursor = None

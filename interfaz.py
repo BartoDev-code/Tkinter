@@ -486,11 +486,11 @@ class EditarFactura(Pantalla):
         for i, nombre in enumerate(campos):
             tk.Label(form_frame, text=f"{nombre}:", bg=BG, fg=NEGRO, font=F_TXT, anchor="e").grid(row=i, column=0, sticky="e", padx=10, pady=8)
             
-            # Si el campo es "Estado", creamos un Combobox desplegable en lugar de un Entry de texto libre
+            
             if nombre == "Estado":
                 e = ttk.Combobox(
                     form_frame, 
-                    values=["EMITIDA", "PAGO PARCIAL", "PAGADA", "ANULADA"], 
+                    values=["EMITIDA", "PAGADA PARCIAL", "PAGADA", "ANULADA"], 
                     font=F_TXT, 
                     state="readonly" # Impide que escriban texto libre, obligando a elegir de la lista
                 )
@@ -504,10 +504,10 @@ class EditarFactura(Pantalla):
         form_frame.columnconfigure(1, weight=1)
 
     def al_mostrar(self):
-        # Limpiamos o seteamos valores por defecto al abrir la pantalla
+        
         for campo, e in self.entradas.items():
             if isinstance(e, ttk.Combobox):
-                e.set("EMITIDA") # Valor por defecto seguro
+                e.set("EMITIDA") 
             else:
                 e.delete(0, "end")
                 
@@ -862,7 +862,7 @@ class Movimientos(Pantalla):
         tk.Button(
              top_bar, text="[+ Nuevo]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, 
              relief="flat", bd=0, command=lambda: self.app.mostrar("EditarMovimiento")
-             ).pack(side="right")
+        ).pack(side="right")
 
         search_bar = tk.Frame(self, bg=BG)
         search_bar.pack(side="top", fill="x", padx=40, pady=10)
@@ -874,13 +874,19 @@ class Movimientos(Pantalla):
             highlightthickness=1, highlightbackground="#b8b4ac"
         )
         self.buscar.pack(side="left", fill="x", expand=True, ipady=3)
+        self.buscar.bind("<Return>", lambda ev: self.refrescar())
+
+        tk.Button(
+            search_bar, text="🔍", bg=TEAL, fg=NEGRO, font=F_TXT, relief="flat",
+            command=self.refrescar
+        ).pack(side="left", padx=10)
 
         table_frame = tk.Frame(self, bg="#ffffff", highlightthickness=2, highlightbackground=BORDE)
         table_frame.pack(side="top", fill="both", expand=True, padx=40, pady=10)
 
-        columnas = ("ID", "Descripcion", "Fecha", "Importe", "Estado", "Categoría")
+        columnas = ("ID", "Cliente", "Descripcion", "Fecha", "Importe", "Tipo")
         self.tabla = ttk.Treeview(table_frame, columns=columnas, show="headings", style="Maq.Treeview", selectmode="browse")
-        anchos = (70, 200, 110, 110, 100, 110)
+        anchos = (70, 170, 200, 120, 110, 100)
         for col, an in zip(columnas, anchos):
             self.tabla.heading(col, text=col, anchor="center")
             self.tabla.column(col, width=an, anchor="center", stretch=True)
@@ -894,8 +900,18 @@ class Movimientos(Pantalla):
         tk.Button(btn_frame, text="[Editar]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, relief="flat").pack(side="left", expand=True, padx=5, ipady=5)
         tk.Button(btn_frame, text="[Eliminar]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, relief="flat").pack(side="left", expand=True, padx=5, ipady=5)
 
-    def nuevo(self):
-        messagebox.showinfo("Movimientos")
+    def al_mostrar(self):
+        self.refrescar()
+
+    def refrescar(self):
+        filtro = self.buscar.get().strip().lower()
+        filas = []
+        for m in self.app.movimientos:
+            texto = (str(m["id"]) + str(m["Cliente"]) + str(m["Descripcion"]) + str(m["Fecha"]) + str(m["Tipo"])).lower()
+            if filtro and filtro not in texto:
+                continue
+            filas.append((m["id"], m["Cliente"], m["Descripcion"], m["Fecha"], m["Importe"], m["Tipo"]))
+        cargar(self.tabla, filas)
 
 # ============================================================
 # FORMULARIO DE MOVIMIENTO
@@ -1027,6 +1043,8 @@ class App(tk.Tk):
     def facturas(self): return self.gestor_datos.obtener_facturas()
     @property
     def pagos(self): return self.gestor_datos.obtener_pagos()
+    @property
+    def movimientos(self): return self.gestor_datos.obtener_movimientos()
 
     @property
     def cliente_edicion(self): return self.gestor_datos.cliente_edicion

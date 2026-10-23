@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS facturas (
         CHECK (
             estado IN (
                 'EMITIDA',
-                'PAGO PARCIAL',
+                'PAGADA_PARCIAL',
                 'PAGADA',
                 'ANULADA'
             )
