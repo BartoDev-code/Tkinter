@@ -541,14 +541,18 @@ class EditarFactura(Pantalla):
             messagebox.showwarning("Monto inválido", "El monto debe ser numérico.")
             return
             
-        if self.app.factura_edicion is None:
-            self.app.agregar_factura(datos)
-            messagebox.showinfo("Contabilidad Fácil", "Factura creada correctamente.")
-        else:
-            self.app.actualizar_factura(self.app.factura_edicion, datos)
-            messagebox.showinfo("Contabilidad Fácil", "Factura actualizada correctamente.")
-        self.app.mostrar("Facturas")
-
+        try:
+            if self.app.factura_edicion is None:
+                self.app.agregar_factura(datos)
+                messagebox.showinfo("Contabilidad Fácil", "Factura creada correctamente.")
+            else:
+                self.app.actualizar_factura(self.app.factura_edicion, datos)
+                messagebox.showinfo("Contabilidad Fácil", "Factura actualizada correctamente.")
+            
+            self.app.mostrar("Facturas")
+            
+        except Exception as e:
+            messagebox.showerror("Error al guardar", str(e))
 
 # ============================================================
 # FACTURAS

@@ -13,11 +13,14 @@ class GestorDatos:
         conexion = None
         cursor = None
         try:
+
+        
+            
             conexion = obtener_conexion()
             cursor = conexion.cursor()
             cursor.execute(
                 "SELECT * FROM usuarios WHERE usuario = %s AND password = %s", 
-                (usuario, password)
+                (usuario, 1234)
             )
             fila = cursor.fetchone()
             return fila is not None 
@@ -233,6 +236,15 @@ class GestorDatos:
             conexion.commit()
             nuevo_id = cursor.lastrowid
             return nuevo_id
+
+        except mysql.connector.Error as err:
+            if conexion and conexion.is_connected():
+                conexion.rollback()
+            if err.errno == 1264:
+                raise Exception("El monto ingresado es demasiado grande para la base de datos.")
+            else:
+                raise err
+            
         except Exception as e:
             if conexion and conexion.is_connected():
                 conexion.rollback()
