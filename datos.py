@@ -1,5 +1,6 @@
 from conexion import obtener_conexion
 from datetime import datetime
+import mysql.connector
 
 class GestorDatos:
     def __init__(self):
@@ -163,9 +164,17 @@ class GestorDatos:
     def eliminar_factura(self, factura_id):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
-        cursor.execute("DELETE FROM facturas WHERE id_factura = %s", (factura_id,))
-        conexion.commit()
-        conexion.close()
+        try:
+            cursor.execute("DELETE FROM facturas WHERE id_factura = %s", (factura_id,))
+            conexion.commit()
+        except mysql.connector.Error as err:
+            conexion.rollback()
+            if err.errno == 1451:
+                raise Exception("No se puede eliminar esta factura porque tiene pagos asociados. Debes eliminar los pagos vinculados primero.")
+            else:
+                raise err
+        finally:
+            conexion.close()
 
     def obtener_factura(self, factura_id):
         conexion = obtener_conexion()
@@ -299,3 +308,36 @@ class GestorDatos:
         fila = cursor.fetchone()
         conexion.close()
         return dict(zip(columnas, fila)) if fila else None
+    def agregar_movimiento(self, datos):
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        try:
+            # Buscar ID del cliente por su nombre
+            cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s", (datos["Cliente"],))
+            res_cliente = cursor.fetchone()
+            if not res_cliente:
+                raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
+            id_cliente = res_cliente[0]
+
+            # Convertir fecha de DD/MM/YYYY a YYYY-MM-DD
+            try:
+                fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
+            except ValueError:
+                fecha = datos["Fecha"]
+
+            monto = float(datos["Monto"].replace(",", "."))
+            tipo = datos["Tipo"].strip().upper()
+            descripcion = datos["Descripción"]
+
+            cursor.execute("""
+                INSERT INTO movimientos (id_cliente, fecha, monto, tipo, descripcion)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (id_cliente, fecha, monto, tipo, descripcion))
+            
+            conexion.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            conexion.rollback()
+            raise e
+        finally:
+            conexion.close()

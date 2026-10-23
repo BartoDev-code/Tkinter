@@ -648,8 +648,12 @@ class Facturas(Pantalla):
         f = self.app.obtener_factura(factura_id)
         if not messagebox.askyesno("Eliminar factura", f"¿Eliminar la factura N° {f['id']}?"):
             return
-        self.app.eliminar_factura(factura_id)
-        self.refrescar()
+            
+        try:
+            self.app.eliminar_factura(factura_id)
+            self.refrescar()
+        except Exception as e:
+            messagebox.showwarning("No se pudo eliminar", str(e))
 
 
 # ============================================================
@@ -851,7 +855,10 @@ class Movimientos(Pantalla):
 
         tk.Label(top_bar, text="Movimientos", bg=MARRON, fg=NEGRO, font=F_TITULO, width=25, pady=10).pack(side="top")
 
-        tk.Button(top_bar, text="[+ Nuevo]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, relief="flat", bd=0).pack(side="right")
+        tk.Button(
+             top_bar, text="[+ Nuevo]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, 
+             relief="flat", bd=0, command=lambda: self.app.mostrar("EditarMovimiento")
+             ).pack(side="right")
 
         search_bar = tk.Frame(self, bg=BG)
         search_bar.pack(side="top", fill="x", padx=40, pady=10)
@@ -883,6 +890,87 @@ class Movimientos(Pantalla):
         tk.Button(btn_frame, text="[Editar]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, relief="flat").pack(side="left", expand=True, padx=5, ipady=5)
         tk.Button(btn_frame, text="[Eliminar]", bg=GRIS, fg=GRIS_TXT, font=F_BTN, relief="flat").pack(side="left", expand=True, padx=5, ipady=5)
 
+    def nuevo(self):
+        messagebox.showinfo("Movimientos")
+
+# ============================================================
+# FORMULARIO DE MOVIMIENTO
+# ============================================================
+
+class EditarMovimiento(Pantalla):
+    def construir(self):
+        top_bar = tk.Frame(self, bg=BG)
+        top_bar.pack(side="top", fill="x", padx=20, pady=20)
+
+        tk.Button(
+            top_bar, text="◀", bg="#111111", fg="white", font=("Arial", 7),
+            relief="flat", bd=0, command=lambda: self.app.mostrar("Movimientos")
+        ).pack(side="left", padx=(0, 10))
+
+        self.titulo = tk.Label(top_bar, text="NUEVO MOVIMIENTO", bg=BG, fg=NEGRO, font=("Arial", 18))
+        self.titulo.pack(side="left")
+
+        tk.Button(
+            top_bar, text="[Guardar]", bg=GRIS, fg=GRIS_TXT, font=F_BTN,
+            relief="flat", bd=0, command=self.guardar
+        ).pack(side="right")
+
+        form_frame = tk.Frame(self, bg=BG)
+        form_frame.pack(side="top", fill="both", expand=True, padx=80, pady=20)
+
+        self.entradas = {}
+        campos = ["Cliente", "Fecha", "Monto", "Tipo", "Descripción"]
+        
+        for i, nombre in enumerate(campos):
+            tk.Label(form_frame, text=f"{nombre}:", bg=BG, fg=NEGRO, font=F_TXT, anchor="e").grid(row=i, column=0, sticky="e", padx=10, pady=8)
+            
+            # Si el campo es "Tipo", ponemos un Combobox con DEBITO / CREDITO
+            if nombre == "Tipo":
+                e = ttk.Combobox(
+                    form_frame, 
+                    values=["DEBITO", "CREDITO"], 
+                    font=F_TXT, 
+                    state="readonly"
+                )
+            else:
+                e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
+                
+            e.grid(row=i, column=1, sticky="ew", padx=10, pady=8, ipady=3)
+            self.entradas[nombre] = e
+
+        tk.Label(form_frame, text="Seleccioná DEBITO o CREDITO según corresponda.", bg=BG, fg=GRIS, font=F_CHICA).grid(row=len(campos), column=1, sticky="w", padx=10)
+        form_frame.columnconfigure(1, weight=1)
+
+    def al_mostrar(self):
+        for campo, e in self.entradas.items():
+            if isinstance(e, ttk.Combobox):
+                e.set("DEBITO")
+            else:
+                e.delete(0, "end")
+        
+        # Seteamos fecha actual por defecto
+        self.entradas["Fecha"].insert(0, "30/09/2026") # O la fecha actual que prefieras manejar
+
+    def guardar(self):
+        datos = {campo: self.entradas[campo].get().strip() for campo in self.entradas}
+        if not datos["Cliente"]:
+            messagebox.showwarning("Datos incompletos", "Ingresá el cliente.")
+            return
+        if not datos["Monto"]:
+            messagebox.showwarning("Datos incompletos", "Ingresá el monto.")
+            return
+        try:
+            float(datos["Monto"].replace(",", "."))
+        except ValueError:
+            messagebox.showwarning("Monto inválido", "El monto debe ser numérico.")
+            return
+            
+        try:
+            self.app.agregar_movimiento(datos)
+            messagebox.showinfo("Contabilidad Fácil", "Movimiento registrado correctamente.")
+            self.app.mostrar("Movimientos")
+        except Exception as e:
+            messagebox.showwarning("No se pudo registrar", str(e))
 
 # ============================================================
 # APP PRINCIPAL (CONTIENE EL GESTOR DE DATOS)
@@ -892,7 +980,7 @@ class App(tk.Tk):
     ORDEN = [
         "Login", "Clientes", "GestionClientes", "EditarCliente",
         "MenuMovimientos", "Facturas", "Pagos", "Movimientos",
-        "EditarFactura", "EditarPago"
+        "EditarFactura", "EditarPago", "EditarMovimiento"
     ]
 
     def __init__(self):
@@ -914,7 +1002,7 @@ class App(tk.Tk):
         clases = (
             Login, Clientes, GestionClientes, EditarCliente,
             MenuMovimientos, Facturas, Pagos, Movimientos,
-            EditarFactura, EditarPago
+            EditarFactura, EditarPago, EditarMovimiento
         )
 
         self.pantallas = {}
@@ -967,6 +1055,8 @@ class App(tk.Tk):
     def actualizar_pago(self, i, d): return self.gestor_datos.actualizar_pago(i, d)
     def eliminar_pago(self, i): return self.gestor_datos.eliminar_pago(i)
     def obtener_pago(self, i): return self.gestor_datos.obtener_pago(i)
+
+    def agregar_movimiento(self, d): return self.gestor_datos.agregar_movimiento(d)
 
     def _estilos(self):
         st = ttk.Style(self)
