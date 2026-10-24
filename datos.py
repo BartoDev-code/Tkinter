@@ -397,21 +397,21 @@ class GestorDatos:
             conexion = obtener_conexion()
             cursor = conexion.cursor()
             
-            # 1. Obtener ID del cliente
+            
             cursor.execute("SELECT id_cliente FROM clientes WHERE nombre = %s LIMIT 1", (datos["Cliente"],))
             resultado_cliente = cursor.fetchone()
             if not resultado_cliente:
                 raise Exception(f"El cliente '{datos['Cliente']}' no existe en la base de datos.")
             id_cliente = resultado_cliente[0]
 
-            # 2. Obtener factura pendiente del cliente (o la asociada)
+            
             cursor.execute("SELECT id_factura, monto FROM facturas WHERE id_cliente = %s AND estado != 'PAGADA' LIMIT 1", (id_cliente,))
             resultado_factura = cursor.fetchone()
             if not resultado_factura:
                 raise Exception("El cliente seleccionado no tiene facturas pendientes de pago.")
             id_factura, monto_factura = resultado_factura[0], resultado_factura[1]
 
-            # Convertir fecha
+           
             try:
                 fecha = datetime.strptime(datos["Fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
             except ValueError:
@@ -420,14 +420,13 @@ class GestorDatos:
             monto_pago = float(datos["Monto"].replace(",", "."))
             metodo_pago = datos["Medio de pago"].strip().upper() 
 
-            # 3. Insertar el pago
+            
             cursor.execute("""
                 INSERT INTO pagos (id_cliente, id_factura, fecha, monto, metodo_pago)
                 VALUES (%s, %s, %s, %s, %s)
             """, (id_cliente, id_factura, fecha, monto_pago, metodo_pago))
 
-            # 4. Determinar si la factura queda PAGADA o PAGADA_PARCIAL
-            # (Opcional: puedes sumar pagos previos si haces pagos fraccionados reales)
+            
             if monto_pago >= float(monto_factura):
                 nuevo_estado = 'PAGADA'
             else:
@@ -437,11 +436,22 @@ class GestorDatos:
                 UPDATE facturas SET estado = %s WHERE id_factura = %s
             """, (nuevo_estado, id_factura))
 
-            # 5. Registrar automáticamente el movimiento en la cuenta corriente
+            
+            cursor.execute("SELECT saldo FROM clientes WHERE id_cliente = %s", (id_cliente,))
+            res_saldo = cursor.fetchone()
+            saldo_anterior = float(res_saldo[0]) if res_saldo and res_saldo[0] is not None else 0.00
+            saldo_nuevo = saldo_anterior - monto_pago
+
+            
             cursor.execute("""
-                INSERT INTO movimientos (id_cliente, fecha, monto, tipo, descripcion)
-                VALUES (%s, %s, %s, 'CREDITO', %s)
-            """, (id_cliente, fecha, monto_pago, f"Pago de factura ID {id_factura}"))
+                UPDATE clientes SET saldo = %s WHERE id_cliente = %s
+            """, (saldo_nuevo, id_cliente))
+
+           
+            cursor.execute("""
+                INSERT INTO movimientos (id_cliente, fecha, monto, tipo, descripcion, saldo_anterior, saldo_nuevo)
+                VALUES (%s, %s, %s, 'CREDITO', %s, %s, %s)
+            """, (id_cliente, fecha, monto_pago, f"Pago de factura ID {id_factura}", saldo_anterior, saldo_nuevo))
 
             conexion.commit()
         except Exception as e:
