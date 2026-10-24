@@ -492,7 +492,7 @@ class EditarFactura(Pantalla):
                     form_frame, 
                     values=["EMITIDA", "PAGADA PARCIAL", "PAGADA", "ANULADA"], 
                     font=F_TXT, 
-                    state="readonly" # Impide que escriban texto libre, obligando a elegir de la lista
+                    state="readonly" 
                 )
             else:
                 e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
@@ -691,27 +691,42 @@ class EditarPago(Pantalla):
 
         self.entradas = {}
         campos = ["Cliente", "Fecha", "Monto", "Medio de pago"]
+        
         for i, nombre in enumerate(campos):
             tk.Label(form_frame, text=f"{nombre}:", bg=BG, fg=NEGRO, font=F_TXT, anchor="e").grid(row=i, column=0, sticky="e", padx=10, pady=8)
-            e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
+            
+            # Solo "Medio de pago" es Combobox; "Cliente", "Fecha" y "Monto" usan Entry normal
+            if nombre == "Medio de pago":
+                e = ttk.Combobox(form_frame, font=F_TXT, state="readonly")
+                e['values'] = ["Efectivo", "Transferencia", "Tarjeta", "Cheque"]
+            else:
+                e = tk.Entry(form_frame, bg=CAMPO, fg=NEGRO, font=F_TXT, relief="flat", insertbackground=NEGRO)
+                
             e.grid(row=i, column=1, sticky="ew", padx=10, pady=8, ipady=3)
             self.entradas[nombre] = e
 
         form_frame.columnconfigure(1, weight=1)
 
     def al_mostrar(self):
-        for e in self.entradas.values():
-            e.delete(0, "end")
+        for campo, e in self.entradas.items():
+            if isinstance(e, ttk.Combobox):
+                e.set("")
+            else:
+                e.delete(0, "end")
+                
         pago_id = self.app.pago_edicion
         if pago_id is None:
             self.titulo.config(text="NUEVO PAGO")
             self.entradas["Fecha"].insert(0, "30/09/2026")
-            
         else:
             self.titulo.config(text="EDITAR PAGO")
             pago = self.app.obtener_pago(pago_id)
             for campo in self.entradas:
-                self.entradas[campo].insert(0, pago.get(campo, ""))
+                valor = pago.get(campo, "")
+                if isinstance(self.entradas[campo], ttk.Combobox):
+                    self.entradas[campo].set(valor)
+                else:
+                    self.entradas[campo].insert(0, valor)
 
     def guardar(self):
         datos = {campo: self.entradas[campo].get().strip() for campo in self.entradas}
@@ -736,7 +751,6 @@ class EditarPago(Pantalla):
             
             self.app.mostrar("Pagos")
         except Exception as e:
-            # Esto mostrará la ventana emergente si el cliente no tiene facturas
             messagebox.showwarning("No se pudo registrar el pago", str(e))
 
 
